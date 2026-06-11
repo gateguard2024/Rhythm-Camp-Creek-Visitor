@@ -43,6 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Calling is not configured. Please contact the office.' }, { status: 500 });
     }
 
+    // The Twilio "From" number must be E.164 (+1XXXXXXXXXX). Normalize it so a
+    // value stored as "7701234567" or "(770) 123-4567" in Vercel still works.
+    const fromNumber = TWILIO_PHONE_NUMBER.startsWith('+')
+      ? TWILIO_PHONE_NUMBER
+      : (toE164(TWILIO_PHONE_NUMBER) || TWILIO_PHONE_NUMBER);
+
     const twilioAuthHeader = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
 
     // ==========================================
@@ -58,7 +64,7 @@ export async function POST(request: Request) {
           },
           body: new URLSearchParams({
             To: formattedResidentPhone,
-            From: TWILIO_PHONE_NUMBER,
+            From: fromNumber,
             Body: `GATE ALERT: Delivery driver (${visitorName}) is requesting access at the gate. Connecting call now...`
           }).toString()
         });
@@ -70,7 +76,7 @@ export async function POST(request: Request) {
     // ==========================================
     // 4. TRIGGER THE ACTUAL PHONE CALL
     // ==========================================
-    const twiml = `<Response><Say>Please wait while we connect your secure call.</Say><Dial callerId="${TWILIO_PHONE_NUMBER}">${formattedResidentPhone}</Dial></Response>`;
+    const twiml = `<Response><Say>Please wait while we connect your secure call.</Say><Dial callerId="${fromNumber}">${formattedResidentPhone}</Dial></Response>`;
 
     const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`, {
       method: 'POST',
@@ -80,7 +86,7 @@ export async function POST(request: Request) {
       },
       body: new URLSearchParams({
         To: formattedVisitorPhone, // Twilio calls the visitor first, then bridges to the resident
-        From: TWILIO_PHONE_NUMBER,
+        From: fromNumber,
         Twiml: twiml
       }).toString()
     });
@@ -88,7 +94,16 @@ export async function POST(request: Request) {
     if (!twilioResponse.ok) {
       const twilioErrorText = await twilioResponse.text();
       console.error("Twilio API rejected the call:", twilioResponse.status, twilioErrorText);
-      return NextResponse.json({ error: 'Call failed to connect. Please try again.' }, { status: 502 });
+      // Surface Twilio's real reason (code + message) so the cause is visible.
+      let detail = '';
+      try {
+        const tw = JSON.parse(twilioErrorText);
+        if (tw?.code || tw?.message) detail = ` (Twilio ${tw.code || ''}: ${tw.message || ''})`;
+      } catch {}
+      return NextResponse.json(
+        { error: `Call failed to connect.${detail}`.trim() },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({ success: true, message: 'Call initiated.' });
