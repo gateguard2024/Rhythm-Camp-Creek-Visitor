@@ -58,18 +58,23 @@ export default function SecureDirectory() {
   const [callingId, setCallingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedResident, setSelectedResident] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchResidents() {
       try {
-        const response = await fetch(`/api/brivo?t=${Date.now()}`, { 
+        const response = await fetch(`/api/brivo?t=${Date.now()}`, {
           cache: 'no-store',
-          headers: { 'Pragma': 'no-cache' } 
+          headers: { 'Pragma': 'no-cache' }
         });
         const data = await response.json();
-        setResidents(Array.isArray(data) ? data : (data.users || []));
-      } catch (e) {
+        if (!response.ok || !Array.isArray(data)) {
+          throw new Error(data?.error || 'The directory is temporarily unavailable.');
+        }
+        setResidents(data);
+      } catch (e: any) {
         console.error("Directory fetch failed:", e);
+        setLoadError(e?.message || 'The directory is temporarily unavailable.');
       } finally {
         setLoading(false);
       }
@@ -150,6 +155,12 @@ export default function SecureDirectory() {
             <div className="flex flex-col items-center mt-12 gap-4">
               <Loader2 className="animate-spin text-blue-600" size={30} />
               <span className="text-[9px] font-black uppercase text-slate-800 tracking-[0.3em]">Syncing Brivo...</span>
+            </div>
+          ) : loadError ? (
+            <div className="text-center py-16 border border-dashed border-red-500/20 rounded-[2.5rem]">
+              <p className="text-red-400 font-black uppercase tracking-[0.2em] text-[11px] mb-2">Directory Unavailable</p>
+              <p className="text-slate-500 text-xs px-6">{loadError}</p>
+              <p className="text-slate-700 text-[9px] mt-3 px-6">Please call the office for assistance.</p>
             </div>
           ) : filteredResidents.map((res: any) => (
             <div key={res.id} className="bg-[#0a0a0a] border border-white/5 p-5 rounded-[2rem] flex justify-between items-center transition-all animate-in fade-in zoom-in-95 duration-500">

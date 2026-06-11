@@ -1,65 +1,52 @@
 import { NextResponse } from 'next/server';
+import { getBrivoToken, brivoApiHeaders, BRIVO_API_BASE } from '../../lib/brivo';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // Pulling all highly sensitive Brivo credentials from Vercel!
-  const BRIVO_API_KEY = process.env.BRIVO_API_KEY || '';
-  const BRIVO_AUTH_BASIC = process.env.BRIVO_AUTH_BASIC || '';
-  const BRIVO_USERNAME = process.env.BRIVO_USERNAME || '';
-  const BRIVO_PASSWORD = process.env.BRIVO_PASSWORD || '';
+  // STEP 1: authenticate
+  const auth = await getBrivoToken();
+  if (!auth.ok) {
+    console.error('Brivo directory auth failed:', auth.step, auth.error, auth.detail);
+    return NextResponse.json(
+      { error: auth.error, step: auth.step },
+      { status: auth.status }
+    );
+  }
 
   try {
-    // STEP 1: LOGIN (Handshake)
-    const tokenResponse = await fetch('https://auth.brivo.com/oauth/token', {
-      method: 'POST',
-      cache: 'no-store', // Always get a fresh token to avoid 59-second expiration
-      headers: {
-        'Authorization': `Basic ${BRIVO_AUTH_BASIC}`,
-        'api-key': BRIVO_API_KEY.trim(),
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': '*/*'
-      },
-      body: new URLSearchParams({ 
-        grant_type: 'password', 
-        username: BRIVO_USERNAME, 
-        password: BRIVO_PASSWORD 
-      }).toString()
+    // STEP 2: fetch the resident list
+    const residentsResponse = await fetch(`${BRIVO_API_BASE}/v1/api/users?pageSize=100`, {
+      cache: 'no-store',
+      headers: brivoApiHeaders(auth.token),
     });
 
-    const tokenData = await tokenResponse.json();
+    const text = await residentsResponse.text();
+    if (!residentsResponse.ok) {
+      console.error('Brivo users request rejected:', residentsResponse.status, text);
+      return NextResponse.json(
+        { error: 'Could not load the resident directory.', step: 'list-users' },
+        { status: 502 }
+      );
+    }
 
-    if (!tokenResponse.ok) return NextResponse.json([{ id: "err", firstName: "Login", lastName: "Rejected" }]);
+    const data = JSON.parse(text);
+    const rawList = data.data || data.users || data.results || [];
 
-    // STEP 2: FETCH USERS (The Daily Sync)
-    const residentsResponse = await fetch('https://api.brivo.com/v1/api/users?pageSize=100', {
-      // Tell Vercel to cache this list for 86,400 seconds (24 hours)
-      next: { revalidate: 86400 }, 
-      headers: {
-        'Authorization': `bearer ${tokenData.access_token}`,
-        'api-key': BRIVO_API_KEY.trim()
-      }
-    });
-
-    if (!residentsResponse.ok) return NextResponse.json([{ id: "err", firstName: "Access", lastName: "Denied" }]);
-
-    const data = await residentsResponse.json();
-    
-    const rawList = data.users || data.data || data.results || [];
-    
-    // 🛑 THE TWEAK: First Initial, Full Last Name
-    const residents = rawList.map((u: any) => ({
-      id: u.id || Math.random().toString(),
-      // Grabs the 1st character of the first name and adds a period (e.g., "J.")
-      firstName: u.firstName ? `${u.firstName.charAt(0)}.` : "",
-      // Keeps the full last name (e.g., "Smith")
-      lastName: u.lastName || "",
-      phoneNumber: u.phoneNumbers?.[0]?.number || "" 
-    }));
+    // First initial + full last name, primary phone number.
+    const residents = rawList
+      .map((u: any) => ({
+        id: u.id ?? '',
+        firstName: u.firstName ? `${u.firstName.charAt(0)}.` : '',
+        lastName: u.lastName || '',
+        phoneNumber: u.phoneNumbers?.[0]?.number || '',
+      }))
+      // Drop blank/placeholder entries that have no name to display.
+      .filter((r: any) => r.lastName || r.firstName);
 
     return NextResponse.json(residents);
-
   } catch (error: any) {
-    return NextResponse.json([{ id: "err", firstName: "System", lastName: "Crash" }]);
+    console.error('Brivo directory crash:', error);
+    return NextResponse.json({ error: 'Directory system error.', step: 'crash' }, { status: 500 });
   }
 }
