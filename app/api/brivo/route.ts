@@ -14,8 +14,9 @@ export async function GET() {
     const tokenResponse = await fetch('https://auth.brivo.com/oauth/token', {
       method: 'POST',
       cache: 'no-store', // Always get a fresh token to avoid 59-second expiration
-      headers: { 
-        'Authorization': `Basic ${BRIVO_AUTH_BASIC}`, 
+      headers: {
+        'Authorization': `Basic ${BRIVO_AUTH_BASIC}`,
+        'api-key': BRIVO_API_KEY.trim(),
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': '*/*'
       },
