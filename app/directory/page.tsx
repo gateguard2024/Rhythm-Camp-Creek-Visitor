@@ -83,10 +83,11 @@ export default function SecureDirectory() {
   }, []);
 
   const filteredResidents = useMemo(() => {
-    if (searchTerm.length < 3) return [];
-    return residents.filter((res: any) => 
-      res?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      res?.firstName?.toLowerCase().includes(searchTerm.toLowerCase())
+    const term = searchTerm.trim().toLowerCase();
+    if (term.length < 3) return [];
+    return residents.filter((res: any) =>
+      // `search` holds the full first + last name; fall back to last name.
+      (res?.search || res?.lastName?.toLowerCase() || '').includes(term)
     );
   }, [residents, searchTerm]);
 
