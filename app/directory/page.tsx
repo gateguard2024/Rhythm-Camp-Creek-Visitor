@@ -89,19 +89,23 @@ export default function SecureDirectory() {
     setIsModalOpen(false);
     setCallingId(selectedResident.id);
     try {
-      await fetch('/api/call', {
+      const response = await fetch('/api/call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           visitorName: visitorName,
           visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
           residentPhone: selectedResident.phoneNumber,
           residentName: `${selectedResident.firstName} ${selectedResident.lastName}`
         })
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Call failed to connect.');
+      }
       alert("Call initiated! Answer your phone to connect.");
-    } catch (e) {
-      alert("Error. Please try again.");
+    } catch (e: any) {
+      alert(e?.message || "Error. Please try again.");
     } finally {
       setCallingId(null);
     }

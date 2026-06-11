@@ -72,20 +72,24 @@ export default function PackagesPage() {
   const handleDeliveryCall = async (visitorName: string, visitorPhone: string) => {
     setIsModalOpen(false);
     try {
-      await fetch('/api/call', {
+      const response = await fetch('/api/call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           visitorName: visitorName,
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`, 
-          residentPhone: `+1${SITE_CONFIG.officePhone}`, 
-          residentName: "Leasing Office (Delivery)", 
+          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          residentPhone: `+1${SITE_CONFIG.officePhone}`,
+          residentName: "Leasing Office (Delivery)",
           reason: "Package / Delivery Courier"
         })
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Call failed to connect.');
+      }
       alert("Call initiated! The Leasing Office has been notified.");
-    } catch (e) {
-      alert("Error. Please try again.");
+    } catch (e: any) {
+      alert(e?.message || "Error. Please try again.");
     }
   };
 

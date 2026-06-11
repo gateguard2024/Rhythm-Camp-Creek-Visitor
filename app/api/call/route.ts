@@ -1,47 +1,30 @@
 import { NextResponse } from 'next/server';
 
+// Normalize any US phone input to E.164 (+1XXXXXXXXXX). Returns null if invalid.
+function toE164(input?: string): string | null {
+  if (!input) return null;
+  const digits = input.replace(/\D/g, '').slice(-10);
+  if (digits.length !== 10) return null;
+  return `+1${digits}`;
+}
+
 export async function POST(request: Request) {
   try {
-    const { visitorName, visitorPhone, residentPhone, residentName, email, reason } = await request.json();
+    const { visitorName, visitorPhone, residentPhone, residentName, reason } = await request.json();
 
     console.log("Call requested:", { visitorName, visitorPhone, residentPhone, residentName });
 
     // ==========================================
-    // 1. LOG THE DATA (Ready for Automation)
+    // 1. VALIDATE INPUT
     // ==========================================
-    try {
-      let googleFormData;
-      let formUrl;
+    const formattedVisitorPhone = toE164(visitorPhone);
+    const formattedResidentPhone = toE164(residentPhone);
 
-      if (email && reason) {
-        // LEASING LEADS LOGGING
-        googleFormData = new URLSearchParams({
-          [process.env.ENTRY_LEAD_NAME || '']: visitorName,      
-          [process.env.ENTRY_LEAD_PHONE || '']: visitorPhone,      
-          [process.env.ENTRY_LEAD_EMAIL || '']: email,            
-          [process.env.ENTRY_LEAD_REASON || '']: reason            
-        });
-        formUrl = process.env.GOOGLE_FORM_URL_LEADS;
-      } else {
-        // STANDARD GATE LOGGING
-        googleFormData = new URLSearchParams({
-          [process.env.ENTRY_VISITOR_NAME || '']: visitorName,      
-          [process.env.ENTRY_VISITOR_PHONE || '']: visitorPhone,      
-          [process.env.ENTRY_RESIDENT_CALLED || '']: residentName        
-        });
-        formUrl = process.env.GOOGLE_FORM_URL_STANDARD;
-      }
-
-      // Only attempt to log if the automation system provided a URL
-      if (formUrl) {
-        await fetch(formUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: googleFormData.toString()
-        });
-      }
-    } catch (logError) {
-      console.error('Logging silently failed.', logError);
+    if (!formattedVisitorPhone) {
+      return NextResponse.json({ error: 'A valid visitor phone number is required.' }, { status: 400 });
+    }
+    if (!formattedResidentPhone) {
+      return NextResponse.json({ error: 'No valid number is available for the person you are trying to reach.' }, { status: 400 });
     }
 
     // ==========================================
@@ -51,13 +34,15 @@ export async function POST(request: Request) {
     const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
     const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_PHONE_NUMBER) {
-      console.error("Missing Twilio Environment Variables in Vercel!");
-      return NextResponse.json({ error: 'System Setup Incomplete' }, { status: 500 });
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+      console.error("Missing Twilio environment variables in Vercel!", {
+        hasSid: !!TWILIO_ACCOUNT_SID,
+        hasToken: !!TWILIO_AUTH_TOKEN,
+        hasNumber: !!TWILIO_PHONE_NUMBER,
+      });
+      return NextResponse.json({ error: 'Calling is not configured. Please contact the office.' }, { status: 500 });
     }
 
-    const cleanResidentNumber = residentPhone.replace(/\D/g, '').slice(-10);
-    const formattedResidentPhone = `+1${cleanResidentNumber}`;
     const twilioAuthHeader = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
 
     // ==========================================
@@ -72,9 +57,9 @@ export async function POST(request: Request) {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            To: formattedResidentPhone, 
+            To: formattedResidentPhone,
             From: TWILIO_PHONE_NUMBER,
-            Body: `🚨 GATE ALERT: Delivery driver (${visitorName}) is requesting access at the gate. Connecting call now...`
+            Body: `GATE ALERT: Delivery driver (${visitorName}) is requesting access at the gate. Connecting call now...`
           }).toString()
         });
       } catch (smsError) {
@@ -85,12 +70,7 @@ export async function POST(request: Request) {
     // ==========================================
     // 4. TRIGGER THE ACTUAL PHONE CALL
     // ==========================================
-    const twiml = `
-      <Response>
-        <Say>Please wait while we connect your secure call.</Say>
-        <Dial callerId="${TWILIO_PHONE_NUMBER}">${formattedResidentPhone}</Dial>
-      </Response>
-    `;
+    const twiml = `<Response><Say>Please wait while we connect your secure call.</Say><Dial callerId="${TWILIO_PHONE_NUMBER}">${formattedResidentPhone}</Dial></Response>`;
 
     const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`, {
       method: 'POST',
@@ -99,7 +79,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        To: visitorPhone, // Twilio calls the visitor first
+        To: formattedVisitorPhone, // Twilio calls the visitor first, then bridges to the resident
         From: TWILIO_PHONE_NUMBER,
         Twiml: twiml
       }).toString()
@@ -107,14 +87,14 @@ export async function POST(request: Request) {
 
     if (!twilioResponse.ok) {
       const twilioErrorText = await twilioResponse.text();
-      console.error("Twilio API Rejected the Call:", twilioErrorText);
-      return NextResponse.json({ error: 'Call failed to connect' }, { status: 500 });
+      console.error("Twilio API rejected the call:", twilioResponse.status, twilioErrorText);
+      return NextResponse.json({ error: 'Call failed to connect. Please try again.' }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true, message: 'Process complete!' });
+    return NextResponse.json({ success: true, message: 'Call initiated.' });
 
   } catch (error: any) {
-    console.error('Switchboard Crash:', error);
-    return NextResponse.json({ error: 'Critical System Crash' }, { status: 500 });
+    console.error('Switchboard crash:', error);
+    return NextResponse.json({ error: 'Critical system error.' }, { status: 500 });
   }
 }

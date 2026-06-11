@@ -157,20 +157,24 @@ export default function EmergencyPage() {
   const handleEmergencyCall = async (visitorPhone: string) => {
     setIsPhoneModalOpen(false);
     try {
-      await fetch('/api/call', {
+      const response = await fetch('/api/call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           visitorName: "Emergency Caller",
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`, 
-          residentPhone: `+1${emergencyPhone.replace(/\D/g, '')}`, 
-          residentName: "After Hours / Emergency", 
+          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          residentPhone: `+1${emergencyPhone.replace(/\D/g, '')}`,
+          residentName: "After Hours / Emergency",
           reason: "Emergency Gate Assistance"
         })
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Call failed to connect.');
+      }
       alert("Call initiated! Please answer your phone to be connected.");
-    } catch (e) {
-      alert("System Error. Please dial 911 if this is a life-threatening emergency.");
+    } catch (e: any) {
+      alert((e?.message || "System Error.") + " If this is a life-threatening emergency, please dial 911.");
     }
   };
 

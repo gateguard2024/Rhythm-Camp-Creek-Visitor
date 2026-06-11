@@ -111,21 +111,25 @@ export default function LandingPage() {
   const handleLeasingCall = async (visitorName: string, visitorPhone: string, email: string, reason: string) => {
     setIsLeasingModalOpen(false);
     try {
-      await fetch('/api/call', {
+      const response = await fetch('/api/call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           visitorName,
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`, 
-          residentPhone: `+1${SITE_CONFIG.officePhone}`, 
+          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          residentPhone: `+1${SITE_CONFIG.officePhone}`,
           residentName: "Leasing Office",
-          email,        
-          reason        
+          email,
+          reason
         })
       });
-      alert(lang === 'es' ? "¡Llamada iniciada!" : "Call initiated! Answer your phone.");
-    } catch (e) {
-      alert("Error. Please try again.");
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Call failed to connect.');
+      }
+      alert(lang === 'es' ? "¡Llamada iniciada! Conteste su teléfono." : "Call initiated! Answer your phone.");
+    } catch (e: any) {
+      alert(e?.message || "Error. Please try again.");
     }
   };
 
