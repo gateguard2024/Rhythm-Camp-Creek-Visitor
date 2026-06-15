@@ -137,7 +137,11 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-[#0a0a0a] bg-[linear-gradient(to_right,#80808015_1px,transparent_1px),linear-gradient(to_bottom,#80808015_1px,transparent_1px)] bg-[size:24px_24px] text-gray-900 dark:text-white flex flex-col items-center font-sans overflow-hidden relative transition-colors duration-300">
-      
+
+      <div className="absolute top-7 left-6 z-10">
+        <span className="text-[9px] font-black uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500 border border-gray-300 dark:border-white/15 px-2.5 py-1 rounded-full">Beta</span>
+      </div>
+
       <div className="absolute top-6 right-6 flex items-center gap-3 z-10">
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 bg-white dark:bg-white/10 border-2 border-gray-200 dark:border-white/20 rounded-full hover:bg-gray-100 dark:hover:bg-white/20 transition-all shadow-sm">
           {theme === 'dark' ? <Sun size={18} className="text-white" /> : <Moon size={18} className="text-gray-800" />}
@@ -214,9 +218,12 @@ export default function LandingPage() {
           </button>
         </div>
 
-        <footer className="mt-auto py-10 flex items-center justify-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-          <ShieldCheck size={16} className="text-gray-500 dark:text-white" />
-          <span className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-500 dark:text-white">{SITE_CONFIG.footerText}</span>
+        <footer className="mt-auto py-10 flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} className="text-gray-500 dark:text-white" />
+            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-500 dark:text-white">{SITE_CONFIG.footerText}</span>
+          </div>
+          <span className="text-[8px] font-bold uppercase tracking-[0.35em] text-gray-400 dark:text-gray-600">Beta Version</span>
         </footer>
       </div>
     </div>
