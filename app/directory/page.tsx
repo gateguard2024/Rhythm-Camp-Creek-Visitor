@@ -172,14 +172,19 @@ export default function SecureDirectory() {
                 <div>
                   <p className="text-lg font-black text-slate-200 uppercase tracking-tighter italic leading-none">{res.firstName} {res.lastName}</p>
                   <div className="flex items-center gap-1 text-[9px] font-black text-slate-700 uppercase tracking-widest mt-1">
-                    <EyeOff size={10} /> Caller ID Protected
+                    {res.phoneNumber ? (
+                      <><EyeOff size={10} /> Caller ID Protected</>
+                    ) : (
+                      <span className="text-amber-600/80">No number on file</span>
+                    )}
                   </div>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => { setSelectedResident(res); setIsModalOpen(true); }}
-                disabled={callingId === res.id}
-                className="bg-blue-600 p-4 rounded-2xl text-white shadow-lg active:scale-95 disabled:opacity-50 transition-all hover:bg-blue-500"
+                disabled={callingId === res.id || !res.phoneNumber}
+                title={!res.phoneNumber ? 'No phone number on file for this resident' : ''}
+                className="bg-blue-600 p-4 rounded-2xl text-white shadow-lg active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all hover:bg-blue-500"
               >
                 {callingId === res.id ? <Loader2 className="animate-spin" size={20} /> : <Phone size={20} fill="currentColor" />}
               </button>
