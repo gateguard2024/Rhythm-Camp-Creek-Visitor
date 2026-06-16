@@ -4,11 +4,19 @@ import { Search, Phone, ArrowLeft, Loader2, EyeOff, ShieldCheck, X } from 'lucid
 import { useRouter } from 'next/navigation';
 import { SITE_CONFIG } from '../config';
 
-// --- PHONE BRIDGE POPUP ---
+// --- REQUEST ENTRY POPUP ---
+const VISIT_REASONS = [
+  'Guest / Visiting',
+  'Delivery / Courier',
+  'Contractor / Service',
+  'Rideshare / Pick-up',
+  'Other',
+];
+
 const VisitorPhoneModal = ({ isOpen, onClose, onConfirm, residentName }: any) => {
   const [name, setName] = useState('');
-  const [number, setNumber] = useState('');
-  
+  const [reason, setReason] = useState('');
+
   if (!isOpen) return null;
 
   return (
@@ -16,35 +24,41 @@ const VisitorPhoneModal = ({ isOpen, onClose, onConfirm, residentName }: any) =>
       <div className="w-full max-w-md bg-[#111] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="text-xl font-black uppercase italic tracking-tighter text-blue-500">Connect to Resident</h3>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Calling {residentName}</p>
+            <h3 className="text-xl font-black uppercase italic tracking-tighter text-blue-500">Request Entry</h3>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Notifying {residentName}</p>
           </div>
           <button onClick={onClose} className="p-2 bg-white/5 rounded-full text-slate-500"><X size={20}/></button>
         </div>
-        
-        <input 
-          type="text" 
+
+        <input
+          type="text"
           placeholder="Your Full Name"
           className="w-full bg-black border border-white/10 p-5 rounded-2xl text-xl text-center font-black text-white outline-none mb-4"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
-        <input 
-          type="tel" 
-          placeholder="(770) 000-0000"
-          className="w-full bg-black border border-white/10 p-5 rounded-2xl text-2xl text-center font-black text-white outline-none mb-6"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-        />
+        <select
+          className="w-full bg-black border border-white/10 p-5 rounded-2xl text-lg text-center font-black text-white outline-none mb-6 appearance-none"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        >
+          <option value="" disabled>Reason for Visit</option>
+          {VISIT_REASONS.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
 
-        <button 
-          onClick={() => onConfirm(name, number)}
-          disabled={number.length < 10 || name.trim() === ''}
+        <button
+          onClick={() => onConfirm(name, reason)}
+          disabled={name.trim() === '' || reason === ''}
           className="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase italic text-sm disabled:opacity-30 transition-opacity"
         >
-          Initiate Secure Call
+          Call Resident to Open Gate
         </button>
+        <p className="text-slate-600 text-[9px] font-bold uppercase tracking-widest mt-4 text-center">
+          The resident will be called and can open the gate from their phone.
+        </p>
       </div>
     </div>
   );
@@ -91,25 +105,25 @@ export default function SecureDirectory() {
     );
   }, [residents, searchTerm]);
 
-  const handlePrivacyCall = async (visitorName: string, visitorPhone: string) => {
+  const handlePrivacyCall = async (visitorName: string, reason: string) => {
     setIsModalOpen(false);
     setCallingId(selectedResident.id);
     try {
-      const response = await fetch('/api/call', {
+      const response = await fetch('/api/gate-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          visitorName: visitorName,
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          visitorName,
+          reason,
           residentPhone: selectedResident.phoneNumber,
           residentName: `${selectedResident.firstName} ${selectedResident.lastName}`
         })
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Call failed to connect.');
+        throw new Error(data.error || 'Could not reach the resident.');
       }
-      alert("Call initiated! Answer your phone to connect.");
+      alert(`Calling ${selectedResident.firstName} ${selectedResident.lastName} now. They can open the gate from their phone.`);
     } catch (e: any) {
       alert(e?.message || "Error. Please try again.");
     } finally {
