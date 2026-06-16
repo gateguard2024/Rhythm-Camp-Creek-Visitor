@@ -46,10 +46,8 @@ const t = {
 
 const LeasingPhoneModal = ({ isOpen, onClose, onConfirm, lang }: { isOpen: boolean, onClose: () => void, onConfirm: any, lang: 'en' | 'es' }) => {
   const [name, setName] = useState('');
-  const [number, setNumber] = useState('');
-  const [email, setEmail] = useState('');
   const [reason, setReason] = useState('');
-  
+
   if (!isOpen) return null;
   const text = t[lang];
 
@@ -63,10 +61,8 @@ const LeasingPhoneModal = ({ isOpen, onClose, onConfirm, lang }: { isOpen: boole
           </div>
           <button onClick={onClose} className="p-3 bg-gray-100 dark:bg-white/10 rounded-full text-gray-800 dark:text-white hover:bg-gray-200 dark:hover:bg-white/20"><X size={24}/></button>
         </div>
-        
+
         <input type="text" placeholder={text.fullName} className="w-full bg-gray-50 dark:bg-black border-2 border-gray-200 dark:border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-gray-900 dark:text-white outline-none mb-3 focus:border-blue-500 transition-colors" value={name} onChange={(e) => setName(e.target.value)} />
-        <input type="email" placeholder={text.email} className="w-full bg-gray-50 dark:bg-black border-2 border-gray-200 dark:border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-gray-900 dark:text-white outline-none mb-3 focus:border-blue-500 transition-colors" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input type="tel" placeholder={text.mobile} className="w-full bg-gray-50 dark:bg-black border-2 border-gray-200 dark:border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-gray-900 dark:text-white outline-none mb-3 focus:border-blue-500 transition-colors" value={number} onChange={(e) => setNumber(e.target.value)} />
         <select className="w-full bg-gray-50 dark:bg-black border-2 border-gray-200 dark:border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-gray-900 dark:text-white outline-none mb-6 focus:border-blue-500 appearance-none transition-colors" value={reason} onChange={(e) => setReason(e.target.value)}>
           <option value="" disabled>{text.reason}</option>
           <option value="Interest in Leasing">{text.reasons.leasing}</option>
@@ -76,7 +72,7 @@ const LeasingPhoneModal = ({ isOpen, onClose, onConfirm, lang }: { isOpen: boole
           <option value="General Inquiry">{text.reasons.general}</option>
         </select>
 
-        <button onClick={() => onConfirm(name, number, email, reason)} disabled={number.length < 10 || name.trim() === '' || email.trim() === '' || reason === ''} className="w-full bg-blue-600 py-6 rounded-2xl font-black uppercase italic text-lg disabled:opacity-30 text-white transition-opacity">
+        <button onClick={() => onConfirm(name, reason)} disabled={name.trim() === '' || reason === ''} className="w-full bg-blue-600 py-6 rounded-2xl font-black uppercase italic text-lg disabled:opacity-30 text-white transition-opacity">
           {text.initiate}
         </button>
       </div>
@@ -108,26 +104,26 @@ export default function LandingPage() {
     setIsOfficeOpen(checkIsOpen());
   }, []);
 
-  const handleLeasingCall = async (visitorName: string, visitorPhone: string, email: string, reason: string) => {
+  const handleLeasingCall = async (visitorName: string, reason: string) => {
     setIsLeasingModalOpen(false);
     try {
-      const response = await fetch('/api/call', {
+      const response = await fetch('/api/gate-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           visitorName,
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          reason,
           residentPhone: `+1${SITE_CONFIG.officePhone}`,
-          residentName: "Leasing Office",
-          email,
-          reason
+          residentName: "Leasing Office"
         })
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Call failed to connect.');
+        throw new Error(data.error || 'Could not reach the office.');
       }
-      alert(lang === 'es' ? "¡Llamada iniciada! Conteste su teléfono." : "Call initiated! Answer your phone.");
+      alert(lang === 'es'
+        ? "Llamando a la oficina. Pueden abrir la puerta desde su teléfono."
+        : "Calling the office now. They can open the gate from their phone.");
     } catch (e: any) {
       alert(e?.message || "Error. Please try again.");
     }

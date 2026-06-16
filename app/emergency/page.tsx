@@ -112,32 +112,32 @@ const KeypadModal = ({ isOpen, onClose }: any) => {
 
 // --- AFTER HOURS CALL MODAL ---
 const EmergencyModal = ({ isOpen, onClose, onConfirm }: any) => {
-  const [number, setNumber] = useState('');
+  const [name, setName] = useState('');
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
       <div className="w-full max-w-md bg-[#111] border-2 border-red-500/50 rounded-[2.5rem] p-8 shadow-2xl shadow-red-900/20">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="text-2xl font-black uppercase italic tracking-tighter text-red-500">Emergency Call</h3>
-            <p className="text-white text-xs font-bold uppercase tracking-widest mt-1">System Bridge</p>
+            <h3 className="text-2xl font-black uppercase italic tracking-tighter text-red-500">Emergency Access</h3>
+            <p className="text-white text-xs font-bold uppercase tracking-widest mt-1">On-Call Staff</p>
           </div>
           <button onClick={onClose} className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 transition"><X size={24}/></button>
         </div>
-        <p className="text-gray-300 text-sm mb-4 text-center font-medium">Enter your mobile number to be connected to the on-call staff.</p>
-        <input 
-          type="tel" 
-          placeholder="Your Mobile Number"
+        <p className="text-gray-300 text-sm mb-4 text-center font-medium">On-call staff will be called and can open the gate from their phone.</p>
+        <input
+          type="text"
+          placeholder="Your Name / Agency"
           className="w-full bg-black border-2 border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-white outline-none mb-6 focus:border-red-500"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
-        <button 
-          onClick={() => onConfirm(number)}
-          disabled={number.length < 10}
+        <button
+          onClick={() => onConfirm(name)}
+          disabled={name.trim() === ''}
           className="w-full bg-red-600 py-6 rounded-2xl font-black uppercase italic text-lg disabled:opacity-30 text-white transition-opacity shadow-[0_0_20px_rgba(220,38,38,0.4)]"
         >
-          Connect Call Now
+          Call On-Call Staff
         </button>
       </div>
     </div>
@@ -154,25 +154,24 @@ export default function EmergencyPage() {
   const afterHoursLabel = process.env.NEXT_PUBLIC_AFTER_HOURS_LABEL || "Call After Hours";
   const emergencyPhone = process.env.NEXT_PUBLIC_EMERGENCY_PHONE || SITE_CONFIG.emergencyPhone;
 
-  const handleEmergencyCall = async (visitorPhone: string) => {
+  const handleEmergencyCall = async (visitorName: string) => {
     setIsPhoneModalOpen(false);
     try {
-      const response = await fetch('/api/call', {
+      const response = await fetch('/api/gate-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          visitorName: "Emergency Caller",
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          visitorName: visitorName || "Emergency caller",
+          reason: "emergency gate assistance",
           residentPhone: `+1${emergencyPhone.replace(/\D/g, '')}`,
-          residentName: "After Hours / Emergency",
-          reason: "Emergency Gate Assistance"
+          residentName: "On-Call Staff"
         })
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Call failed to connect.');
+        throw new Error(data.error || 'Could not reach on-call staff.');
       }
-      alert("Call initiated! Please answer your phone to be connected.");
+      alert("Calling on-call staff now. They can open the gate from their phone.");
     } catch (e: any) {
       alert((e?.message || "System Error.") + " If this is a life-threatening emergency, please dial 911.");
     }

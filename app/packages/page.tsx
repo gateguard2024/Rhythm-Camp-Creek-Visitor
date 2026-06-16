@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SITE_CONFIG } from '../config';
 
-// --- TWILIO BRIDGE MODAL (For Delivery Drivers) ---
+// --- DELIVERY MODAL (single-call, press-9-to-open) ---
 const DeliveryModal = ({ isOpen, onClose, onConfirm, isOfficeOpen }: any) => {
   const [name, setName] = useState('');
-  const [number, setNumber] = useState('');
-  
+
   if (!isOpen) return null;
 
   return (
@@ -18,34 +17,32 @@ const DeliveryModal = ({ isOpen, onClose, onConfirm, isOfficeOpen }: any) => {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h3 className="text-2xl font-black uppercase italic tracking-tighter text-blue-400">
-              {isOfficeOpen ? "Call Office" : "Office Closed"}
+              {isOfficeOpen ? "Request Entry" : "Office Closed"}
             </h3>
-            <p className="text-white text-xs font-bold uppercase tracking-widest mt-1">Delivery Log</p>
+            <p className="text-white text-xs font-bold uppercase tracking-widest mt-1">Delivery</p>
           </div>
           <button onClick={onClose} className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 transition"><X size={24}/></button>
         </div>
-        
-        <input 
-          type="text" 
+
+        <input
+          type="text"
           placeholder="Courier Name / Company"
-          className="w-full bg-black border-2 border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-white outline-none mb-3 focus:border-blue-500"
+          className="w-full bg-black border-2 border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-white outline-none mb-6 focus:border-blue-500"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <input 
-          type="tel" 
-          placeholder="Your Mobile Number"
-          className="w-full bg-black border-2 border-white/20 p-5 rounded-2xl text-xl text-center font-bold text-white outline-none mb-6 focus:border-blue-500"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-        />
-        <button 
-          onClick={() => onConfirm(name, number)}
-          disabled={number.length < 10 || name.trim() === '' || !isOfficeOpen}
+        <button
+          onClick={() => onConfirm(name)}
+          disabled={name.trim() === '' || !isOfficeOpen}
           className="w-full bg-blue-600 py-6 rounded-2xl font-black uppercase italic text-lg disabled:opacity-30 text-white transition-opacity"
         >
-          {isOfficeOpen ? "Request Gate Access" : "Cannot Accept Deliveries"}
+          {isOfficeOpen ? "Call Office to Open Gate" : "Cannot Accept Deliveries"}
         </button>
+        {isOfficeOpen && (
+          <p className="text-slate-600 text-[9px] font-bold uppercase tracking-widest mt-4 text-center">
+            The office will be called and can open the gate from their phone.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -69,25 +66,24 @@ export default function PackagesPage() {
     setIsOfficeOpen(checkIsOpen());
   }, []);
 
-  const handleDeliveryCall = async (visitorName: string, visitorPhone: string) => {
+  const handleDeliveryCall = async (visitorName: string) => {
     setIsModalOpen(false);
     try {
-      const response = await fetch('/api/call', {
+      const response = await fetch('/api/gate-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          visitorName: visitorName,
-          visitorPhone: `+1${visitorPhone.replace(/\D/g, '')}`,
+          visitorName,
+          reason: "a delivery",
           residentPhone: `+1${SITE_CONFIG.officePhone}`,
-          residentName: "Leasing Office (Delivery)",
-          reason: "Package / Delivery Courier"
+          residentName: "Leasing Office"
         })
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Call failed to connect.');
+        throw new Error(data.error || 'Could not reach the office.');
       }
-      alert("Call initiated! The Leasing Office has been notified.");
+      alert("Calling the office now. They can open the gate from their phone.");
     } catch (e: any) {
       alert(e?.message || "Error. Please try again.");
     }
